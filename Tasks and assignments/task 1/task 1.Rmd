@@ -1,0 +1,201 @@
+---
+title: "Review ANOVA"
+author: "Nzambuli Daniel"
+date: "2024-05-15"
+output: html_document
+---
+
+# Consider the following two sets of data: 
+
+**Case 1: Equal Replications**
+
+| Replicate | Treatment A | Treatment B | Treatment C |
+|-----------|-------------|-------------|-------------|
+| 1         | 23          | 42          | 47          |
+| 2         | 36          | 26          | 43          |
+| 3         | 31          | 47          | 43          |
+| 4         | 33          | 34          | 39          |
+
+**Case 1: Unequal Replications**
+
+| Replicate | Treatment A | Treatment B | Treatment C | Treatment D |
+|-----------|-------------|-------------|-------------|-------------|
+| 1         | 2           | 1.7         | 2           | 2.1         |
+| 2         | 2.2         | 1.9         | 2.4         | 2.2         |
+| 3         | 1.8         | 1.5         | 2.7         | 2.2         |
+| 4         | 2.3         |             | 2.5         | 1.9         |
+| 5         | 1.7         |             | 2.4         |             |
+
+## 1. Write the hypothesis to be tested
+
+$h_0$ – the mean for each treatment has **no statistiacally significant difference**
+
+$h_1$ – there is a **statistically significant** differenence in the mean of each treatment
+
+## 2. Calculate the correction factor, Total SS, Treatment SS and Error SS
+
+$$
+experiment\ units = repetitions * treatments\\
+n = r * t
+$$
+
+```{r}
+equal_reps = data.frame(replicate = seq(1,4),
+                        treat_A = c(23, 36, 31, 33),
+                        treat_B = c(42, 26, 47, 34),
+                        treat_C = c(47, 43, 43, 39)
+)
+print("Equal Repetition")
+equal_reps
+unequal_reps = data.frame(replicate = seq(1, 5),
+                          treat_A = c(2, 2.2, 1.8, 2.3, 1.7),
+                          treat_B = c(1.7, 1.9, 1.5, NA, NA),
+                          treat_C = c(2, 2.4, 2.7, 2.5, 2.4),
+                          treat_D = c(2.1, 2.2, 2.2, 1.9, NA))
+print("Unequal Repetition")
+unequal_reps
+```
+
+$$
+correction\ factor = \frac{grand\ total ^ 2}{observations}\\
+= \frac{(\sum^{treatments[A, B, C]}_{i=A}a \in i) ^ 2}{4 * 3}
+$$
+
+**Correction Factor for Equal Replicates**
+
+```{r}
+equal_n = nrow(equal_reps) * ncol(equal_reps[-1])
+equal_exp_total = sum(equal_reps[-1])
+equal_corr_f = (equal_exp_total^ 2)/ equal_n
+cat("The correction factor of equal replicates is:\n", equal_corr_f, "\n")
+```
+
+**Unequal Replicates**
+
+Remove the na before calculation
+
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+```{r}
+unequal_n =  sum(!is.na(unequal_reps[-1]))
+unequal_exp_total = sum(unequal_reps[-1], na.rm = TRUE)
+unequal_corr_f = (unequal_exp_total^ 2)/ unequal_n
+cat("The correction factor of equal replicates is:\n", unequal_corr_f, "\n")
+```
+
+**Total Sum of squares equal replicates**
+
+```{r}
+equal_tss = sum(equal_reps[-1]^ 2) - equal_corr_f
+cat("The equal replicates total sum of squares is:\n", equal_tss, "\n")
+```
+
+**Unequal replicates**
+
+```{r}
+unequal_tss = sum(unequal_reps[-1]^ 2, na.rm = TRUE) - unequal_corr_f
+cat("The unequal replicates total sum of squares is:\n", unequal_tss, "\n")
+```
+
+**Treatment sum of squares equal replicates**
+
+```{r}
+equal_tts = colSums(equal_reps[-1])
+equal_ttss = sum(equal_tts^2)/ nrow(equal_reps) - equal_corr_f
+cat("The equal replicates treatment sum of squares is:\n", equal_ttss, "\n")
+```
+
+**unequal replicates**
+
+```{r}
+unequal_tts = colSums(unequal_reps[-1], na.rm = T)
+unequal_ttss = sum(unequal_tts^2)/ colSums(!is.na(unequal_reps)) - unequal_corr_f
+cat("The unequal replicates treatment sum of squares is:\n", unequal_ttss, "\n")
+```
+
+**Error sum of squares equal replicates**
+
+```{r}
+cat("The equal replicates error sum of squares is:\n", equal_tss - equal_ttss, "\n")
+```
+
+**Unequal replicates**
+
+```{r}
+cat("The equal replicates error sum of squares is:\n", unequal_tss - unequal_ttss, "\n")
+```
+
+## 3. Generate the ANOVA table
+
+**Equal replicates**
+
+```{r}
+equal_long = equal_reps %>% gather(key = "treatment", value = "value", - replicate) # using every column except the replicate column
+equal_long
+```
+
+**The anova table**
+
+```{r}
+anova_equal_reps = aov(value~treatment, data = equal_long)
+summary(anova_equal_reps)
+```
+
+**Unequal replicates**
+
+```{r}
+# there are na in the unequal replicate data 
+# using filter can help ~i hope 
+unequal_long = unequal_reps %>% gather(key = "treatment", value = "value", - replicate) %>% filter(!is.na(value)) # using every column except the replicate column
+unequal_long
+```
+
+**The anova table**
+
+```{r}
+anova_unequal_reps = aov(value~treatment, data = unequal_long)
+summary(anova_unequal_reps)
+```
+
+## 4. At 5% and 10% levels of significance, test the hypothesis and make conclusions
+
+Display the p-values
+
+```{r}
+equal_pval = summary(anova_equal_reps)[[1]][["Pr(>F)"]][1]
+unequal_pval = summary(anova_unequal_reps)[[1]][["Pr(>F)"]][1]
+
+hypothesis_conclusion = function(sig_lev, pval, case){
+  cat("\nAt", round(pval, 4), "% significance level:\n")
+  if(pval < sig_lev){
+     cat("for case", case,"at significance level", sig_lev, "Reject the null hypothesis.\n\tConclude that there is a statistically significance difference in the treatment means")
+  }else{
+    cat("for case", case,"at significance level", sig_lev, "Fail to reject the null hypothesis.\n\tConclude that there is no statistically significance difference in the treatment means")
+  }
+}
+```
+
+### conclusions
+
+**equal replica**
+
+```{r}
+hypothesis_conclusion(0.05, equal_pval, "equal replicates")
+```
+
+```{r}
+hypothesis_conclusion(0.1, equal_pval, "equal replicates")
+```
+
+**unequal replica**
+
+```{r}
+hypothesis_conclusion(0.05, unequal_pval, "unequal replicates")
+```
+
+```{r}
+hypothesis_conclusion(0.1, unequal_pval, "unequal replicates")
+```
