@@ -1,0 +1,370 @@
+---
+title: "Task 2  Design of Experiments"
+author: "Nzambuli Daniel"
+date: "2024-05-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1
+
+A researcher is conducting an experiment to test the effectiveness of four different fertilizers (A, B, C, and D) on the yield of a specific crop. The experiment is conducted in four different fields (blocks) to account for variability in soil quality and other environmental factors. Each field is divided into four plots, and each fertilizer is randomly assigned to one plot within each field.
+
+The yield data (in kilograms) from the experiment are as follows:
+
+| Field | Fertilizer A | Fertilizer B | Fertilizer C | Fertilizer B |
+|:-----:|:------------:|:------------:|:------------:|:------------:|
+|   1   |      20      |      18      |      15      |      22      |
+|   2   |      25      |      24      |      20      |      23      |
+|   3   |      18      |      17      |      14      |      20      |
+|   4   |      22      |      21      |      19      |      24      |
+
+## a) State the null and alternative hypotheses for this experiment.
+
+$H_0$ there is **No statistically significant difference** in the mean yield for each fertilizer treatment
+
+$H_1$ There is at least one fertilizer with a **statistically significant** difference in the mean yield for each fertilizer treatment
+
+## b) Construct an ANOVA table for the RCBD analysis and determine whether there is a significant difference among the fertilizers and (or) replicates at the 0.05 significance level.
+
+```{r}
+exp_1 = data.frame(field = seq(1, 4),
+                   fertilizer_a = c(20, 25, 18, 22),
+                   fertilizer_b = c(18, 24, 17, 21),
+                   fertilizer_c = c(15, 20, 14, 19),
+                   fertilizer_d = c(22, 23, 20, 24))
+exp_1
+```
+
+### Convert to long format
+
+```{r}
+library(tidyr)
+
+exp_1_long = pivot_longer(exp_1, c(2, 3, 4, 5), 
+                                    names_to = "fertilizer",
+                                    values_to = "Yield",
+                                    names_prefix = "fertilizer_")
+
+exp_1_long$fertilizer = toupper(gsub("fertilizer_", "", exp_1_long$fertilizer))
+exp_1_long$field = factor(exp_1_long$field)
+names(exp_1_long)[1] = "Field"
+
+exp_1_long
+```
+
+### Create the anova table
+
+```{r}
+exp_1_aov = aov(Yield~fertilizer + Error(Field), 
+                data = exp_1_long)
+summary(exp_1_aov)
+```
+
+```{r}
+check_p_val = function(pval, sig_level){
+  if(pval < sig_level){
+    cat("At a significance level of:\n", sig_level,"\nwe reject H_0.\n\tConclude:\n\t\tthere atleast one mean yield from fertilizer treatment that is statistically and significantly different from the other yields")
+  }else{
+    cat("At a significance level of:\n", sig_level,"\nwe fail to reject H_0.\n\tConclude:\n\t\tno statistically significant mean yield from fertilizer treatment")
+  }
+}
+```
+
+```{r}
+str(summary(exp_1_aov))
+```
+
+```{r}
+str(summary(exp_1_aov)$"Error: Within")
+```
+
+```{r}
+summary(exp_1_aov)$"Error: Within"[[1]]$"Pr(>F"
+```
+
+```{r}
+exp_1_pval = summary(exp_1_aov)$"Error: Within"[[1]]$"Pr(>F"[1]
+exp_1_pval
+```
+
+```{r}
+check_p_val(exp_1_pval, 0.05)
+```
+
+## c) Interpret the results of the ANOVA table.
+
+> **OUTPUT**
+>
+> ```         
+> Error: Field  
+>           Df Sum Sq Mean Sq F value Pr(>F) 
+> Residuals  3  81.25   27.08                 
+>
+> Error: Within            
+>             Df Sum Sq Mean Sq F value   Pr(>F)     
+> fertilizer  3  62.25  20.750   18.22 0.000365 *** 
+> Residuals   9  10.25   1.139                      
+> --- 
+> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> ```
+>
+> **Interpretation**
+>
+> 1.  **Error: Field** - **`does not reflect the variability within the treatments applied uniformly across the fields`.** Measures the variability in yields due to differences in environmental conditions or other field-specific factors.
+> 2.  **Error: Within** - This error component **`captures the variation within each block after accounting for the block effects`** Focuses on the variability due to the treatments (fertilizers).
+>
+> -   ***Field Data*** – `1, 2, 3, 4` does not have p-value or F-statistic value. This indicates that the model is only accounting for variability within the fields; It is testing for ***variability of the effects of different fertilizers*** and not the effect of the different fields.
+>
+> -   ***Fertilizer data*** - `A, B , C, D` does have a very low p-value of `0.000365` indicating that there is at least one mean of the yield due to the effect of fertilizer that is statistically and significantly different form the other means.
+>
+> Because of this a post hoc is needed to determine the fertilizer that cause the very high variability expressed by the f-statistic value of `18.22`
+
+## d) Conduct a post-hoc analysis if necessary
+
+$$
+LSD = t_{crotical} * \sqrt{2 * MSE/n}
+$$
+
+-   **First Mean Sq** under "Error: Within" the effect of fertilizers directly
+
+-   **Second Mean Sq** under "Error: Within" corresponds to the residual error after accounting for the main effects of treatments, which is used for homogeneous error estimation in post-hoc analysis.
+
+```{r}
+exp_1_mse = summary(exp_1_aov)$"Error: Within"[[1]]$"Mean Sq"[2]
+exp_1_df = summary(exp_1_aov)$"Error: Within"[[1]]$"Df"[1]
+
+cat("The mean squared error is:\n\t", exp_1_mse, "\nThe degrees of freedom are:\n\t", exp_1_df)
+```
+
+```{r}
+observe_per_grp = length(exp_1_long$Yield) / length(unique(exp_1_long$fertilizer))
+
+# at 95% CF
+exp_1_t = qt(0.95, exp_1_df)
+
+# lsd
+
+exp_1_lsd = exp_1_t * sqrt(2 * exp_1_mse/ observe_per_grp)
+
+exp_1_lsd
+```
+
+### Compare pairwise difference with LSD
+
+> LSD assumes
+>
+> 1.  Homogeneity of variation
+> 2.  Normally distributed residuals
+
+```{r}
+# using the error within data 
+
+# testing normal distribution
+shapiro.test(exp_1_aov$Within$residuals)
+```
+
+> **Interpretation**
+>
+> because the p-value is $\gt 0.05$ we fail to reject $H_0$. Conclude that the residuals follow a normal distribution. This **follows** the assumption of LSD
+
+```{r}
+library(car)
+leveneTest(Yield~fertilizer, data = exp_1_long)
+```
+
+> **Interpretation**
+>
+> because the p-value is $\gt 0.05$ we fail to reject $H_0$. Conclude that the residuals are homogeneous. This **follows** the assumption of LSD
+
+```{r}
+exp_1_pairwise_differences = with(exp_1_long, tapply(Yield, fertilizer, mean))
+exp_1_comparisons = expand.grid(names(exp_1_pairwise_differences), names(exp_1_pairwise_differences))
+exp_1_comparisons$difference = abs(exp_1_pairwise_differences[exp_1_comparisons$Var1] - exp_1_pairwise_differences[exp_1_comparisons$Var2])
+exp_1_comparisons$significant = exp_1_comparisons$difference > exp_1_lsd
+
+exp_1_comparisons
+```
+
+### Ordered
+
+```{r}
+exp_1_comparisons_dec = exp_1_comparisons[order(exp_1_comparisons$difference, decreasing = T),]
+
+exp_1_comparisons_dec
+```
+
+> **Interpretation**
+>
+> 1.  Fertilizers **D** and **C** have the most significant difference in yields with their pairwise difference being `5.25`
+> 2.  This is followed by **A** and **C** at `4.25`
+> 3.  **B** and **C** follow at `3.0`
+>
+> From this it can be observed that fertilizer C has the most statistically significant difference with all the other variables while the fertilizers **A, B** and **C** have no statistically significant difference in their mean yield
+
+# Question 2
+
+A researcher conducted an experiment to evaluate the growth performance of four different plant varieties (A, B, C, and D) in five different soil types (blocks). Each soil type represents a different field condition. The experiment was set up in a randomized complete block design, with each combination of plant variety and soil type replicated four times. However, due to unforeseen circumstances, two observations are missing from the data:
+
+| Block (Soil Type) | Variety A | Variety B | Variety C | Variety D |
+|:-----------------:|:---------:|:---------:|:---------:|:---------:|
+|         1         |    15     |    17     |    20     |     ?     |
+|         2         |     ?     |    18     |    22     |    21     |
+|         3         |    16     |    19     |    23     |    20     |
+|         4         |    14     |    16     |     ?     |    19     |
+|         5         |    18     |    20     |    24     |    22     |
+
+## a) Estimate the missing values in this dataset.
+
+$$
+missing_{i, j} = \frac{(n0.\ of\ replicates* \sum replicate\ missing) + (no.\ treatment * \sum treatment missing) + EXP\ total}{(replicates - 1) (treatments - 1)}
+$$
+
+```{r}
+miss_data = data.frame(soil = seq(1, 5),
+                       plant_a = c(15, NA, 16, 14, 18),
+                       plant_b = c(17, 18, 19, 16, 20),
+                       plant_c = c(20, 22, 23, NA, 24),
+                       plant_d = c(NA, 21, 20, 19, 22))
+miss_data
+```
+
+### all but 1 missing
+
+```{r}
+row_sum_1 = sum(miss_data[2,c(3, 4, 5)], na.rm = T)/3
+col_sum_1 = sum(miss_data[c(1, 3, 4, 5),2], na.rm = T)/4
+miss_data[2, 2] = (row_sum_1 + col_sum_1)/2
+
+miss_data
+```
+
+### Add col and row sums
+
+```{r}
+miss_data[6,] = c(NA,colSums(miss_data[,2:ncol(miss_data)], na.rm = T))
+miss_data$row_sum = rowSums(miss_data[,2:ncol(miss_data)], na.rm = T)
+miss_data
+```
+
+```{r}
+which(is.na(miss_data), arr.ind = T)
+```
+
+```{r}
+add_val = function(row, col){
+val = ((5 * miss_data[row, 6]) + (4 * miss_data[6, col]) - miss_data[6,6])/((5 - 1) * (4 -1))
+return(val)
+}
+
+miss_data[4, 4] = add_val(4, 4)
+miss_data[6,] = c(NA,colSums(miss_data[,2:ncol(miss_data)], na.rm = T))
+miss_data$row_sum = rowSums(miss_data[,2:ncol(miss_data)], na.rm = T)
+miss_data[1, 5] = add_val(1, 5)
+
+miss_data[6,] = c(NA,colSums(miss_data[,2:ncol(miss_data)], na.rm = T))
+miss_data$row_sum = rowSums(miss_data[,2:ncol(miss_data)], na.rm = T)
+
+miss_data
+```
+
+## b)Conduct an analysis of variance (ANOVA) to test whether there are significant differences in the mean growth performance among the four plant varieties and(or) the soil types at the 0.05 significance level, using the completed dataset.
+
+```{r}
+exp_2_data = miss_data[1:5, 1:5]
+exp_2_data
+```
+
+```{r}
+exp_2_long = pivot_longer(exp_2_data, c(2, 3, 4, 5), 
+                                    names_to = "variety",
+                                    values_to = "yield",
+                                    names_prefix = "plant_")
+
+exp_2_long$variety = toupper(gsub("plant_", "", exp_2_long$variety))
+exp_2_long$soil = factor(exp_2_long$soil)
+names(exp_2_long)[1] = "soil"
+
+exp_2_long
+```
+
+```{r}
+exp_2_aov = aov(yield~variety + Error(soil), data = exp_2_long)
+summary(exp_2_aov)
+```
+
+```{r}
+check_p_val(summary(exp_2_aov)$"Error: Within"[[1]]$"Pr(>F"[1], 0.05)
+```
+
+## c) Interpret the results of the ANOVA and discuss any implications for the study.
+
+1.  **Error: soil**
+
+-   No significant variance is attributable to soil differences alone, as there are no F value or p-value computations.
+
+2.  Error: Within
+
+-   Variety: The variance between different plant varieties is not statistically significant (F = 1.111, p = 0.383), suggesting that the plant variety does not significantly affect the outcome.
+
+**Residuals**: Variability within the groups (after accounting for variety) is presented without a test for significance.
+
+**Finally** the plant varieties do not show a significant effect in different soil conditions within the tested setup.
+
+## d)Conduct a post-hoc analysis if necessary
+
+```{r}
+shapiro.test(exp_2_aov$Within$residuals)
+```
+
+> because the p-value is $\gt 0.05$ we fail to reject $H_0$. Conclude that the residuals follow a normal distribution. This **follows** the assumption of LSD
+
+```{r}
+leveneTest(yield~variety, data = exp_2_long)
+```
+
+> because the p-value is $\gt 0.05$ we fail to reject $H_0$. Conclude that the residuals are homogeneous. This **follows** the assumption of LSD
+
+```{r}
+exp_2_mse = summary(exp_2_aov)$"Error: Within"[[1]]$"Mean Sq"[2]
+exp_2_df = summary(exp_2_aov)$"Error: Within"[[1]]$"Df"[1]
+observe_per_grp_2 = length(exp_2_long$yield) / length(unique(exp_2_long$variety))
+
+# at 95% CF
+exp_2_t = qt(0.95, exp_2_df)
+
+# lsd
+
+exp_2_lsd = exp_2_t * sqrt(2 * exp_2_mse/ observe_per_grp)
+
+exp_2_lsd
+```
+
+```{r}
+exp_2_pairwise_differences = with(exp_2_long, tapply(yield, variety, mean))
+exp_2_comparisons = expand.grid(names(exp_2_pairwise_differences), names(exp_2_pairwise_differences))
+exp_2_comparisons$difference = abs(exp_2_pairwise_differences[exp_2_comparisons$Var1] - exp_2_pairwise_differences[exp_2_comparisons$Var2])
+exp_2_comparisons$significant = exp_2_comparisons$difference > exp_2_lsd
+
+exp_2_comparisons
+```
+
+```{r}
+exp_2_comparisons_dec = exp_2_comparisons[order(exp_2_comparisons$difference, decreasing = T),]
+
+exp_2_comparisons_dec
+```
+
+> **Interpretation**
+>
+> There is no statistically significant difference in the yield across the different varieties of plants which matches the conclusion of the anova analysis
+>
+> The variation within the soil types is also not significant.
+>
+> To get the least variation in yield
+>
+> 1.  Planting variety A or D will give consistent similar results with little variation
+> 2.  The most significant yield variation is between variety D and C
