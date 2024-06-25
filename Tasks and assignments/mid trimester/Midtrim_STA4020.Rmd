@@ -14,12 +14,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Given the field layout and yields in bushels per acre from an experiment on dusting wheat with sulfur to control stem rust, analyze the data using advanced statistical methods. Following a Latin square design, the treatments applied are:
 
-> A = Dusted before rains
-> C = Dusted once each week
-> E = Control or check
+> A = Dusted before rains C = Dusted once each week E = Control or check
 >
-> B = Dusted after rains
-> D = Drifting once each week
+> B = Dusted after rains D = Drifting once each week
 
 The yields for each treatment are as follows:
 
@@ -119,7 +116,7 @@ Rss_q1 = (sum(Field_tot_q1$Field_Yield^2) / nrow(Field_tot_q1)) - cor_fct_q1
 cat("The row sum of squares is:\n\t\t", Rss_q1)
 ```
 
-### Column sum of squares 
+### Column sum of squares
 
 $$
 col\ sum\ squares = \frac{\sum column}{No.\ of\ columns} - CF
@@ -216,6 +213,8 @@ cat("The p-value for Field is:\n\t\t",p_field)
 ### Using AOV in R
 
 ```{r}
+q1_data$Fields = factor(q1_data$Fields)
+q1_data$Acre = factor(q1_data$Acre)
 q1_data$Treatment = as.factor(q1_data$Treatment)
 q1_aov = aov(Yield~Fields + Acre + Treatment, data = q1_data)
 summary(q1_aov)
@@ -223,13 +222,17 @@ summary(q1_aov)
 
 #### Interpretation
 
-> At a significance level of `0.05` for $H_0$ there is no statistically significant difference in the mean bushel yield and $H_1$ there is at least one mean yield that is statistically and significantly different from the rest of the means
+> At a significance level of `0.05`
 >
-> -   **Acres –** Fail to reject $H_0$ since the p-value is larger than `0.05` . Conclude that the mean yields given different acres has no statistically significant difference.
+> $H_0$ there is no statistically significant difference in the mean bushel yield
 >
-> -   **Field –** Reject $H_0$ since the p-value is lower than `0.05`. Conclude that one of the mean yields given different Fields is statistically significant from the other mean yields
+> $H_1$ there is at least one mean yield that is statistically and significantly different from the rest of the means
 >
-> -   **Treatment –** Reject $H_0$ since the p-value is lower than `0.05`. Conclude that one of the mean yields given Treatment is statistically significant from the other mean yield
+> -   **Acres –** Fail to reject $H_0$ since the p-value is larger than `0.05` . Conclude that different acres , have no statistically significant difference on the mean yields has .
+>
+> -   **Field –** Reject $H_0$ since the p-value is lower than `0.05`. Conclude that given given different Fields at least one of the Fields has statistically significant difference from the other mean yields.
+>
+> -   **Treatment –** Reject $H_0$ since the p-value is lower than `0.05`. Conclude that given given different Treatments at least one of the Treatments has statistically significant difference from the other mean yields.
 >
 > This mirrors the calculated conclusion.
 
@@ -298,14 +301,14 @@ median( q1_data[q1_data$Treatment %in% c("A", "B","D"), "Yield"])
 
 From the analysis:
 
-1.  **Dusting once each week (C)** – has the highest yield suggesting regular application of sulfur is the most effective method to control stem rust and maximize wheat yields.
-2.  The events **Dusting before rains (A)** and **Dusting after rains (B)** have lower yields. This indicates that timing sulfur application around a rain event is less effective in improving plant yields
-3.  A and B have similar mean yields similar to **The control (E)**. This enforces the claim that dusting around rain events may not improve the overall yield of wheat by controlling stem rust
+1.  **Dusting once each week (C)** – has the highest yield suggesting regular application of sulfur is the most effective method of control stem rust and maximize wheat yields.
+2.  The events **Dusting before rains (A)** and **Dusting after rains (B)** have lower yields. This indicates that timing sulfur application around a rain event is less effective in improving crop yields
+3.  A and B have close mean yields to **The control (E)**. This enforces the claim that dusting around rain events may not improve the overall yield of wheat by controlling stem rust
 4.  **Drifting once each week (D)** – This has higher yields than dusting after rain. However, the improvement is not high to justify this as a viable option.
 
-**Advice**
+**Recommendation**
 
--   For optimal control of stem rust and to maximize wheat yield, adopting a practice of dusting once each week (C) is recommended. It can be augmented by improving the plant resistance to stem rust by genetic modification GM. This is because the
+-   For optimal control of stem rust and to maximize wheat yield, adopting a practice of dusting once each week (C) is recommended. It can be augmented by improving the plant resistance to stem rust by genetic modification GM.
 
 -   Practices based solely on dusting around rain events (either before or after) is less effective and should be avoided if the goal is to maximize yield
 
@@ -326,7 +329,7 @@ The rations consist of: - A: Hay alone - B: Various mixtures of hay and barley (
 
 ## 1. Assess the effects of different rations on the digestibility of nitrogen. Include an analysis of variance (ANOVA) to test the significance of the ration effects, period effects, and steer effects.
 
-### Load the data 
+### Load the data
 
 ```{r}
 q2_data = data.frame(Steer = rep(1:6, each = 6),
@@ -337,10 +340,10 @@ q2_data = data.frame(Steer = rep(1:6, each = 6),
                                    'E', 'B', 'F', 'D', 'C', 'A',
                                    'D', 'C', 'E', 'A', 'B', 'F',
                                    'F', 'E', 'A', 'B', 'D', 'C'),
-                     Digestion = c(61.1, 69.3, 67.6, 61.6, 58.8,65.2,
+                     Digestion = c(61.1, 69.3, 67.6, 61.9, 58.8,65.2,
                                    56.9, 59.1, 64.0, 61.0, 65.7, 56.6,
                                    66.5, 62.2, 61.1, 66.2, 62.0, 62.2,
-                                   66.7, 67.4, 63.6, 53.2, 61.7, 62.0,
+                                   66.7, 67.4, 65.1, 65.1, 69.6, 52.7,
                                    67.8, 64.7, 63.6, 53.2, 61.7, 62.0,
                                    71.4, 67.5, 55.8, 63.2, 68.0, 62.9))
 q2_data
@@ -350,6 +353,8 @@ q2_data
 
 ```{r}
 q2_data$Treatment = as.factor(q2_data$Treatment)
+q2_data$Steer = factor(q2_data$Steer)
+q2_data$Period = factor(q2_data$Period)
 str(q2_data)
 ```
 
@@ -366,11 +371,11 @@ $H_1$ there is at-least one digestion coefficient of nitrogen that is statistica
 
 ### Findings
 
-based on a significance level of `0.1`
+based on a significance level of `0.05`
 
 -   **Treatment** – Given that the p-value is less than the significant value. We reject $H_0$ and conclude that at-least one mean digestion coefficient of nitrogen is different for the 6 rations.
 
--   **Period** – Given that the p-value is less than the significant value. We reject $H_0$ and conclude that at-least one mean digestion coefficient of nitrogen is different for the 6 periods.
+-   **Period** – Given that the p-value is less than the significant value. We reject $H_0$ and conclude that the mean digestion coefficient of nitrogen has at least one statistically or significantly different mean for the 6 periods.
 
 -   **Steers** – Given that the p-value is greater than the significant value. We fail to reject $H_0$ and conclude that the mean digestion coefficient of nitrogen is not statistically or significantly different for all the 6 steers.
 
@@ -407,22 +412,45 @@ ggplot(q2_data, aes(x = Treatment, y = Digestion, fill = Treatment))+
 
 ### Observation
 
-1.  There are two groups one with **E, D, C, F** and **B** and the other containing **A** and **B only**
-2.  There are extreme values in **B** , **D** and **F**
-3.  **A** has the lowest values. In spite of A and B being grouped together, most of the values in A fall in between the **lower extreme** and the **first quartile** of B
-4.  A appears to be the most significantly different value from the other rations based on digestion of nitrogen
-5.  E has the **highest median with the narrowest IQR** indicating that it has the most consistent digestion coefficient of nitrogen
+1.  There are three groups one with **E, D, C, F,** the next group has **C, F** and **B** and **A only** in the third group
+2.  There are extreme values in **B** and **F**
+3.  **C, D** and **E** have the highest overall yield
+4.  **A** has the lowest values. with high IQR variation
+5.  A appears to be the most significantly different value from the other rations based on digestion of nitrogen
+6.  E has the **highest median with the narrowest IQR** indicating that it has the most consistent digestion coefficient of nitrogen
 
 ## 3. Discuss the implications of your findings for nutritional strategies in cattle farming, highlighting any potential benefits or drawbacks of specific rations based on the digestibility results.
 
 to achieve the most consistent results in steer digestion
 
--   Rations **C** and **E** should be given. This ensures consistent digestion of nitrogen while also getting relatively high proportions of nitrogen absorption in the digestive tract of the steers compared to the nitrogen intake
+-   Rations **C, D** and **E** should be given. This ensures consistent digestion of nitrogen while also getting relatively high proportions of nitrogen absorption in the digestive tract of the steers compared to the nitrogen intake
 
-when the rations **C** and **E** are not accessible **B, D and F** can be used as substitutes. Although they have some extreme values they do produce consistently high median nitrogen absorption for nitrogen intake.
+when the rations **C, D** and **E** are not accessible **B and F** can be used as substitutes. Although they have some extreme values and medians around the first quartile, they do produce higher yields than the median nitrogen absorption for nitrogen intake of **A**.
 
 **Avoid**
 
 -   Ration A should be avoided because it produces the lowest overall nitrogen digestion coefficients.
 
--   However, if it is an essential ration it should be supplemented with one of the higher digestible rations to try and offset its low coefficient of digestible nitrogen
+-   However, if it is an essential ration it should be supplemented with one of the higher digestible **C, D** or **E** rations to try and offset its low coefficient of digestible nitrogen. The farmer is recommended not to substitute with **B** or **F** as it may lower the benefits of using them as rations leading to low yields.
+
+-   This is because of the low median yields for **B** and **F**
+
+## A case of being curious
+
+-   Why does the other significant value have only one \*
+
+-   Can this one \* indicate that its hard to distinguish the groups ?
+
+### Investigating which Field was different in Q1
+
+```{r}
+lsd_q1_field = LSD.test(aov(Yield~Fields, data = q1_data), "Fields", p.adj = "none")
+lsd_q1_field$groups
+```
+
+### Investigating which Period was different
+
+```{r}
+lsd_q2_opt = LSD.test(aov(Digestion~Period, data = q2_data), "Period", p.adj = "none")
+lsd_q2_opt$groups
+```
