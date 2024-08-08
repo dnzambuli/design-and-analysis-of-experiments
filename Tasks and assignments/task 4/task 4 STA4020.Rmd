@@ -1,0 +1,415 @@
+---
+title: "task 4"
+author: "Nzambuli Daniel"
+date: "2024-07-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1: Factorial Arrangement
+
+Consider a factorial experiment with the following factors and levels:
+
+-   Factor A: Temperature (2 levels: Low and High) - **Fixed Effect**
+-   Factor B: Humidity (2 levels: Low and High) - **Fixed Effect**
+-   Factor C: Light Exposure (2 levels: Low and High) - **Fixed Effect**
+
+# a. How many treatment combinations are there in this factorial experiment?
+
+Taking that the levels of each factor are mutually exclusive. That is if
+
+-   temperature is low if and only if temperature is not high
+
+-   and it is the same for humidity and light exposure
+
+```{r}
+library(ggplot2)
+# both events at the same time
+treat_comb = combinat::combn(c("A1","A2", "B1", "B2", "C1", "C2"), 3)
+treat_comb
+```
+
+remove all the columns where the initial statement is not collaborated
+
+### Validate selection
+
+```{r}
+check_combn = function(comb){
+  if ("A1" %in% comb && "A2" %in% comb)
+    return(FALSE)
+  if ("B1" %in% comb && "B2" %in% comb)
+    return(FALSE)
+  if ("C1" %in% comb && "C2" %in% comb)
+    return(FALSE)
+  return(T)
+}
+```
+
+```{r}
+treat_comb = treat_comb[, apply(treat_comb, 2, check_combn)]
+treat_comb
+```
+
+### Answer
+
+> there are `8 treatment combinations` based on the information given
+
+# b. Write down the full factorial design matrix including all treatment combinations.
+
+```{r}
+library(dplyr)
+library(stringr)
+full_design = data.frame(t(treat_comb))
+colnames(full_design) = c("Temperature_A", "Humidity_B", "Light_Exposure_C")
+
+full_design = full_design %>% mutate(
+  across(everything(), ~case_when(
+    endsWith(., "1")~ "low",
+    endsWith(., "2")~ "high",
+    TRUE ~ .
+  ))
+)
+
+full_design
+```
+
+# c. Assume you have conducted the experiment and collected data on the response variable.
+
+Experiments that are impacted by the three observed factors
+
+> 1.  **Plant Growth Studies**: The growth and health of plants are highly dependent on light, temperature, and humidity(Aggie Horticulture, 2019).
+> 2.  **Evaporation Experiments**: Experiments investigating the rate of evaporation of liquids often need to control for temperature, humidity, and light exposure(Awana, 2013).
+> 3.  **Material Degradation**: Studies on the degradation of materials, such as hair or textiles, often consider the effects of temperature, humidity, and light(Kenji Kuwayama et al., 2023).
+> 4.  **Sleep Quality Research**: Research on sleep quality sometimes examines the effects of environmental conditions like temperature, humidity, and light exposure(Cao et al., 2020).
+> 5.  **Greenhouse Management**: In greenhouse settings, the interplay between light, temperature, and humidity is crucial for optimizing plant growth(tempCube, 2023).
+
+Choosing to generate a random count of desloratadine in pg/mg in hair from the material degradation experiment
+
+## Perform a factorial ANOVA to analyze the effects of Factors A, B, and C on the response.
+
+Taking that there is an equal chance of finding desloratadine in hair data is generated using a uniform distribution.
+
+```{r}
+temperature_effect <- c("low(T)" = -30, "high(T)" = 60)
+humidity_effect <- c("low(H)" = 18, "high(H)" = 90)
+light_exposure_effect <- c("low(L)" = 254 , "high(L)" = 365)
+```
+
+```{r}
+set.seed(221)
+response_2 = runif(64, min = 150, max = 300)
+
+response = response_2
+response
+```
+
+```{r}
+des_data = data.frame (
+  Temperature = rep(rep(c("low(T)", "high(T)"), each = 4), 8),
+  Humidity = rep(rep(c("low(H)", "high(H)"), times = 4), 8),
+  Light_exposure = rep(rep(c("low(L)", "high(L)"), times = 2, each = 2), 8),
+  Treatment = rep(as.factor(seq(1,8)), 8),
+  Replicates = as.factor(rep(seq(1, 8), each = 8)),
+  Response = response
+)
+
+des_data$Response = with(des_data, Response + 
+                          temperature_effect[Temperature] +
+                          humidity_effect[Humidity] +
+                          light_exposure_effect[Light_exposure])
+
+des_data = des_data %>%
+  mutate(Temperature = as.factor(Temperature)) %>%
+  mutate(Humidity = as.factor(Humidity)) %>%
+  mutate(Light_exposure = as.factor(Light_exposure))
+
+head(des_data)
+```
+
+#### Confirm correct replication
+
+```{r}
+table(des_data$Humidity, des_data$Light_exposure, des_data$Replicate)
+```
+
+## Provide the ANOVA table summarizing the results.
+
+```{r}
+anova_table = aov(Response~Temperature*Humidity*Light_exposure, data = des_data)
+
+summary(anova_table)
+```
+
+## Interpret the p-values and determine which factors (if any) have statistically significant effects on the response variable.
+
+> **Observation**
+>
+> $H_0$ there is no statistically significant difference in the mean concentration of desloratadine in decomposing hair
+>
+> $H_1$ there is at-least one mean that is statistically and significant different from the other mean concentration of desloratadine in decomposing hair
+>
+> -   **Temperature**, **humidity** and **light exposure** have p-values that are less than the significant value of `0.05`
+>
+> -   the cross interactions **Temperature:humidity** , **Temperature:light exposure, Humidity:light exposure** and **Temperature:Humidity:light exposure** have a $p-value\gt0.05$
+>
+> **Interpretation**
+>
+> -   **Temperature**, **humidity** and **light exposure** have a great impact on the concentration of desloratadine in decomposing hair
+>
+> -   Their interaction however has no significant difference in the observed mean of desloratadine in decomposing hair
+>
+> **Conclusion**
+>
+> There needs to be a post-hoc to understand the what specific combination of factors cause this difference for Temperature, Humidity and Light Exposure
+
+### Post-hoc Analysis
+
+```{r}
+library(agricolae)
+
+temp_lsd = LSD.test(anova_table, c("Humidity", "Temperature", "Light_exposure"))$groups
+temp_lsd
+```
+
+> **Observations**
+>
+> There are `5 groups`
+>
+> 1.  **Group 1**
+>     -   high(H):high(T):high(L)
+> 2.  **Group 2**
+>     -   high(H):low(T):high(L)
+>     -   low(H):high(T):high(L)
+>     -   high(H):high(T):low(L)
+> 3.  **Group 3**
+>     -   low(H):low(T):high(L)
+> 4.  **Group 4**
+>     -   low(H):high(T):low(L)
+> 5.  **Group 5**
+>     -   high(H):low(T):low(L)
+>     -   low(H):low(T):low(L)
+>
+> The highest concentration is found when there is `high humidity` , `high temperature` and `high light exposure`
+>
+> The lowest concentration is found when there is `low humidity` , `low temperature` and `low light intensity`
+>
+> **Conclusion**
+>
+> Desloratadine is an antihistamine used to relieve allergy symptoms such as watery eyes, runny nose; Additionally, desloratadine is used to treat skin hives and itching in people with chronic skin reactions(Drugscom,2019). The enzyme seems to be very sensitive to low temperatures, low humidity and low light intensity.
+
+### Interaction plot
+
+```{r}
+interaction.plot(
+  des_data$Humidity, des_data$Light_exposure, des_data$Response,
+  xlab = "Humidity", ylab = "Mean Response", trace.label = "Light Exposure",
+  col = c("red", "blue"), lwd = 2
+)
+```
+
+```{r}
+interaction.plot(
+  des_data$Humidity, des_data$Temperature, des_data$Response,
+  xlab = "Humidity", ylab = "Mean Response", trace.label = "Temperature",
+  col = c("red", "blue"), lwd = 2
+)
+```
+
+```{r}
+interaction.plot(
+  des_data$Temperature, des_data$Light_exposure, des_data$Response,
+  xlab = "Temperature", ylab = "Mean Response", trace.label = "Light Exposure",
+  col = c("red", "blue"), lwd = 2
+)
+```
+
+> **Observation**
+>
+> there is no cross interaction between the variables however:
+>
+> -   There is a **convergence** in the case of ``` Humidity``moves from high to low``and Light Exposure ``` , ``` Humidity``moves from high to low``and Temperature ```
+>
+> -   There is **divergence** in the case of `Temperature moves from high to low and Light Exposure`
+>
+> The concentration increases as Humidity decreases
+>
+> -   The mean concentration is generally higher under conditions of high Light Exposure and higher Temperature.
+>
+> -   Light Exposure tends to have a consistently positive effects.
+>
+> -   The impact of Temperature and Light Exposure appears more higher than that of Humidity and Light Exposure
+>
+> a graphical analysis to understand the distribution better.
+
+### Box plots
+
+```{r}
+data_1 = des_data[, c(1, 2, 3, 6)]
+data_1$interactions = interaction(data_1$Humidity, data_1$Light_exposure, data_1$Temperature)
+head(data_1)
+```
+
+```{r}
+fill_light = ggplot(data_1, aes(x=interactions, y=Response, fill=Light_exposure)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Interactions", x="Light_exposure", y="Response")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+fill_temp = ggplot(data_1, aes(x=interactions, y=Response, fill=Temperature)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Interactions", x="Temperature", y="Response")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+fill_humidity = ggplot(data_1, aes(x=interactions, y=Response, fill=Humidity)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Interactions", x="Humidity", y="Response")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r fig.width= 10, fig.height=20}
+library(gridExtra)
+grid.arrange(fill_light, fill_temp, fill_humidity, nrow = 3, ncol = 1)
+```
+
+> the box plot
+>
+> -   **Consistent Trends**: High levels of Light Exposure, Temperature, and Humidity generally lead to higher concentrations, indicating a positive correlation.
+>
+> -   **Interaction Effects**: The varying heights and spreads of the box plots across the different factors suggest significant interaction effects. Like in the case of the combination of high Light Exposure, high Temperature, and high Humidity appears to provide a conducive environment for enhancing the concentration.
+>
+> -   **Variability and Outliers**: Some categories exhibit outliers, suggesting that while the general trends hold, some observations behave differently due to uncontrolled environmental conditions that were not monitored.
+
+# Question 2: Split-Plot Arrangement
+
+Consider a split-plot experiment where the main plots (whole plots) receive different treatments and subplots (split-plots) within each main plot receive additional treatments. The experiment has:
+
+-   Main Plot Factor: Fertilizer Type (2 levels: Organic and Inorganic) - **Fixed Effect**
+
+-   Subplot Factor: Irrigation Frequency (3 levels: Low, Medium, High) - **Random Effect**
+
+> **Note**
+>
+> In a split-plot design, larger plots (whole plots) are assigned to the main treatments, which are easier or more economical to change. Subplots within these whole plots receive the secondary treatments, which are typically more detailed and require finer control (Zach, 2020).
+
+# a. Describe how the split-plot arrangement is structured in terms of whole plots and split-plots.
+
+**Whole Plots:** Receive one of two types of fertilizer, either Organic or Inorganic.
+
+**Subplots:** Within each whole plot, there are three subplots that each receive one of three levels of irrigation frequency: Low, Medium, and High.
+
+| Main-plot Organic      | Main-plot Inorganic    |
+|------------------------|------------------------|
+| **Irrigation**: Low    | **Irrigation**: Low    |
+| **Irrigation**: Medium | **Irrigation**: Medium |
+| **Irrigation**: High   | **Irrigation**: High   |
+
+The main aim of the study is to compare the yield from **Organic** and **Inorganic** fertilizer applied on the main plots
+
+The treatments in the subplots **Irrigation** are more detailed and need fine control. While **Fertilizers** are more economical and easier to apply.
+
+Subplots reflect general conclusions about the impact of irrigation frequency across different conditions.
+
+# b. Write down the design matrix showing all treatment combinations.
+
+```{r}
+agri_data = data.frame(
+  fertilizer = rep(c("organic", "inorganic"), each = 3),
+  irrigation = rep(c("low", "medium", "high"), times = 2)
+)
+agri_data = as.matrix(agri_data)
+agri_data
+```
+
+# c. Assume you have collected data on the response variable from the split-plot experiment.
+
+```{r}
+agri_df = data.frame(
+  fertilizer = as.factor(rep(c("organic", "inorganic"), each = 3 * 4 * 2)),
+  irrigation = as.factor(rep(c("low", "medium", "high"), times = 4 * 2)),
+  treatments = as.factor(rep(1:6, each = 4)),
+  replicates = as.factor(rep(1:4, times = 6))
+)
+agri_df
+```
+
+### Selecting Farming Yields
+
+> Farming yields can not have
+>
+> **A Uniform distribution** this is because the probability of plant yields is affected by highly random factors like: soil quality, climate, and plant genetics.
+>
+> Because of this a random normal distribution is selected.
+
+```{r}
+set.seed(225)
+rand_no = rnorm(48, mean = 0, sd = 1)
+
+# using the range of 55 - 159 from the ( United States Department of Agriculture (USDA), 2024)
+agri_df$Yields = with(agri_df, 55 + (rand_no - min(rand_no)) * (159 - 55) / (max(rand_no) - min(rand_no)) + 
+                       as.numeric(fertilizer) * 5 + as.numeric(irrigation) * 3)
+
+head(agri_df)
+```
+
+## Perform a split-plot ANOVA to analyze the effects of the Fertilizer Type (main plot factor) and Irrigation Frequency (subplot factor) on the response.
+
+#### Confirm correct table
+
+```{r}
+table(agri_df$fertilizer, agri_df$irrigation, agri_df$replicates)
+```
+
+```{r}
+library(nlme)
+
+irrigation_model = lme(Yields ~ fertilizer* irrigation, random = ~ 1 | replicates,
+             data = agri_df)
+irrigation_table = anova(irrigation_model)
+```
+
+## Provide the ANOVA table summarizing the results, including main effects and interaction effects.
+
+```{r}
+irrigation_table
+```
+
+```{r}
+variance_components = VarCorr(irrigation_model)
+variance_components
+```
+
+## Interpret the p-values and determine which factors (if any) have statistically significant effects on the response variable. Discuss any significant interactions
+
+> **Observations**
+>
+> -   All the p-values are above `0.05`
+>
+> **Conclusion**
+>
+> Because of this we fail to reject $H_0$ which states that there is no statistically significant difference in the mean of the yields.
+>
+> Because of this a conclusion that **irrigation**, **fertilizers** and their **cross-interaction** do not impact the yields of wheat based on the generated data set to model the USDA values
+
+# **References**
+
+United States Department of Agriculture (USDA). (2024, May 10). *USDA forecasts winter wheat production up 2% in 2024, orange production down 2% from April forecast*. Www.nass.usda.gov. <https://www.nass.usda.gov/Newsroom/2024/05-10-2024.php>
+
+Aggie Horticulture. (2019). *Light, Temperature and Humidity \| Ornamental Production*. Tamu.edu. <https://aggie-horticulture.tamu.edu/ornamental/a-reference-guide-to-plant-care-handling-and-merchandising/light-temperature-and-humidity/>
+
+Awana, M. (2013). *Science projects on whether the color of water affects its evaporation*. Sciencing. <https://sciencing.com/science-projects-whether-color-water-affects-its-evaporation-12304792.html>
+
+Cao, T., Lian, Z., Miyazaki, R., & Bao, J. (2020). Comprehensive Effects of Temperature, Relative Humidity, and Illumination on Sleep Quality. *Proceedings of the 11th International Symposium on Heating, Ventilation and Air Conditioning (ISHVAC 2019)* , 1295–1303. Environmental Engineering. <https://doi.org/10.1007/978-981-13-9520-8_133>
+
+Kenji Kuwayama, Hajime Miyaguchi, Kanamori, T., Kenji Tsujikawa, Tadashi Yamamuro, Segawa, H., Okada, Y., & Iwata, Y. (2023). Effects of temperature, humidity, light, and soil on drug stability in hair: A preliminary study for estimating personal profiles using micro-segmental analysis of corpse hair. *Forensic Toxicology*, *42*, 60–70. <https://doi.org/10.1007/s11419-023-00675-9>
+
+tempCube. (2023, September 25). *The interplay between light, temperature, and humidity in greenhouse S*. TempCube. <https://tempcube.io/blogs/temperature-humidity/the-interplay-between-light-temperature-and-humidity-in-greenhouse-settings>
+
+Zach. (2020, September 15). *What is a split-plot design? (Explanation & example)*. Statology. <https://www.statology.org/split-plot-design/>
+
+Zach. (2022, April 19). *How to use fisher’s least significant difference (LSD) in R*. Statology. <https://www.statology.org/fishers-lsd-in-r/>

@@ -1,0 +1,219 @@
+---
+output:
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## setup framework for rows, columns and treatments
+
+```{r}
+
+rows<- c(rep("r1",1), rep("r2",1), rep("r3",1), rep("r4",1), rep("r5",1))
+cols<- c(rep("cA",5), rep("cB",5), rep("cC",5), rep("cD",5), rep("cE",5))
+treatments<- c("A","C","D","E","B", "D","B","C","A","E", "E","A","B","C","D",
+               "B","E","A","D","C", "C","D","E","B","A")
+
+
+```
+
+
+## assign data to variable "yield"
+
+```{r}
+
+yield<- c(7.4,11.8,10.1,8.8,11.8,8.9,6.5,17.9,10.1,8.8,5.8,8.7,9.0,15.7,14.3,
+          12.0,7.6,8.5,11.1,18.4,14.3,7.9,7.1,7.4,10.1)
+y<- data.frame(cols,rows,treatments, yield)
+matrix(y$treatments, 5,5)
+matrix(y$yield, 5,5)
+
+```
+
+## apply a linear model then compute the analysis of variance table
+
+```{r}
+
+yfit <- lm(yield ~ rows+cols+treatments, y)
+anova(yfit)
+
+```
+
+
+## Combined Analysis Across Latin Squares
+
+### Input the Data for Three 3x3 Latin Squares
+
+```{r}
+# Data for three Latin squares
+square1 <- matrix(c(41, 25, 15, 20, 32, 24, 22, 12, 21), nrow=3, byrow=TRUE)
+square2 <- matrix(c(27, 28, 3, 4, 17, 9, 22, 4, 17), nrow=3, byrow=TRUE)
+square3 <- matrix(c(43, 27, 17, 22, 34, 26, 24, 14, 23), nrow=3, byrow=TRUE)
+
+# Convert the data to a dataframe
+df1 <- data.frame(row=rep(1:3, each=3), col=rep(1:3, times=3), 
+                  trt=factor(c('B', 'C', 'A', 'A', 'B', 'C', 'C', 'A', 'B')),
+                  yield=c(41, 25, 15, 20, 32, 24, 22, 12, 21))
+df2 <- data.frame(row=rep(1:3, each=3), col=rep(1:3, times=3), 
+                  trt=factor(c('C', 'B', 'A', 'A', 'C', 'B', 'B', 'A', 'C')),
+                  yield=c(27, 28, 3, 4, 17, 9, 22, 4, 17))
+df3 <- data.frame(row=rep(1:3, each=3), col=rep(1:3, times=3), 
+                  trt=factor(c('B', 'C', 'A', 'A', 'B', 'C', 'C', 'A', 'B')),
+                  yield=c(43, 27, 17, 22, 34, 26, 24, 14, 23))
+```
+
+### Perform Bartlett’s Chi-square Test for Homogeneity of Variance
+
+```{r}
+# Error sums of squares
+error_ss1 <- 21.56
+error_ss2 <- 14.89
+error_ss3 <- 21.56
+
+# Error degrees of freedom
+error_df <- 2
+
+# Error mean squares
+error_ms1 <- error_ss1 / error_df
+error_ms2 <- error_ss2 / error_df
+error_ms3 <- error_ss3 / error_df
+
+# Log of each error MS
+log_error_ms1 <- log(error_ms1)
+log_error_ms2 <- log(error_ms2)
+log_error_ms3 <- log(error_ms3)
+
+# Pooled Error MS
+pooled_error_ms <- (error_ss1 + error_ss2 + error_ss3) / (3 * error_df)
+
+# Bartlett's Chi-square test
+chisq_value <- (3 * (log(pooled_error_ms) - (log_error_ms1 + log_error_ms2 + log_error_ms3) / 3)) * (3 * error_df)
+p_value <- pchisq(chisq_value, df=2, lower.tail=FALSE)
+
+# Print results
+chisq_value
+p_value
+```
+
+### Calculate Treatment Totals, Correction Factor, and Various Sums of Squares
+
+```{r}
+# Treatment totals
+treatment_totals <- data.frame(
+  treatment = c('A', 'B', 'C'),
+  square1 = c(47, 94, 71),
+  square2 = c(11, 59, 61),
+  square3 = c(53, 100, 77)
+)
+treatment_totals$total <- rowSums(treatment_totals[, -1])
+
+# Correction Factor (CF)
+total_yield <- sum(treatment_totals$total)
+correction_factor <- (total_yield^2) / (3 * 3 * 3)
+
+# Total SS
+total_ss <- sum((c(square1, square2, square3))^2) - correction_factor
+
+# Square SS
+square_ss <- sum(c(212, 131, 230)^2 / (3 * 3)) - correction_factor
+
+# Row(Square) SS (Additive across squares)
+row_ss <- sum(c(126.89, 130.89, 126.89))
+
+# Column(Square) SS (Additive across squares)
+column_ss <- sum(c(89.55, 110.22, 89.55))
+
+# Treatment SS
+treatment_ss <- sum(treatment_totals$total^2 / (3 * 3)) - correction_factor
+
+# Square x Treatment SS
+sq_x_trt_ss <- total_ss - square_ss - treatment_ss
+
+# Error SS (Additive across squares)
+error_ss <- sum(c(21.56, 14.89, 21.56))
+
+# ANOVA table
+anova_table <- data.frame(
+  SOV = c('Square', 'Row(Sq)', 'Column(Sq)', 'Trt', 'Sq X Trt', 'Error', 'Total'),
+  Df = c(2, 6, 6, 2, 4, 6, 26),
+  SS = c(square_ss, row_ss, column_ss, treatment_ss, sq_x_trt_ss, error_ss, total_ss)
+)
+anova_table$MS <- anova_table$SS / anova_table$Df
+anova_table$F <- c(NA, NA, NA, anova_table$MS[4] / anova_table$MS[6], anova_table$MS[5] / anova_table$MS[6], NA, NA)
+
+# Print ANOVA table
+anova_table
+```
+
+### Calculate the Least Significant Difference (LSD) for Treatments
+
+```{r}
+# LSD for treatment
+alpha <- 0.05
+t_critical <- qt(1 - alpha / 2, df = anova_table$Df[6])
+lsd_trt <- t_critical * sqrt(2 * anova_table$MS[6] / (3 * 3))
+
+# Print LSD
+lsd_trt
+```
+## Importing data
+
+```{r}
+
+library(readxl)
+data = read_excel(path = "data-LS Design.xlsx",
+                col_names = TRUE)
+
+head(data)
+str(data)
+
+```
+
+## changing variables structure into factors
+
+
+```{r}
+data$Row <- as.factor(data$Row)
+data$Column <- as.factor(data$Column)
+data$Varieties <- as.factor(data$Varieties)
+str(data)
+attach(data)
+```
+
+## Applying analysis of variance model
+```{r}
+
+model <- lm(Yield ~ Row+Column+Varieties)
+anova(model)
+
+```
+
+
+## Mean comparison test
+
+```{r}
+
+library(agricolae)
+# LSD test
+LSD.test(y = model,
+         trt = "Varieties",
+         DFerror = model$df.residual,
+         MSerror = deviance(model)/model$df.residual,
+         alpha = 0.05,
+         group = TRUE,
+         console = TRUE)
+
+
+# SNK test
+SNK.test(y = Yield,
+         trt = Varieties,
+         DFerror = model$df.residual,
+         MSerror = deviance(model)/model$df.residual,
+         alpha = 0.05,
+         group = TRUE,
+         console = TRUE)
+
+```

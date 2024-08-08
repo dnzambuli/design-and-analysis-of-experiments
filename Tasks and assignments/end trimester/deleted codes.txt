@@ -1,0 +1,83 @@
+{r}
+custom_LSD_anova = function(data){
+  
+  grouping = function(data, col_name){
+    df = data %>% group_by(data[[col_name]]) %>% summarize(Total_yield = sum(Yield))
+    colnames(df) = c(col_name, "Yield")
+    return(df)
+}
+  
+  # group by treatment
+  treat_grp = grouping(data, "Treatment")
+  
+  # calculate yield 
+  total_yield = sum(data$Yield)
+  
+  # number of groups
+  n_grp = 5
+  
+  mn_yield = mean(total_yield)
+  
+  # sum of squares
+  total_ss = sum((data$Yield - mn_yield)^2)
+  tss = sum((treat_grp$Yield - mn_yield)^2)*5
+  ess = total_ss - tss
+  
+  # degrees of freedom 
+  tot_df = 25 -1
+  
+  library(zeallot)
+  t_df = 5
+  
+  err_df = tot_df - t_df
+  
+  # mean square
+  ms_treat = tss/t_df 
+  ms_err = ess/err_df 
+  
+  # f stat
+  f_treat = ms_treat/ms_err
+  
+  # p-val
+  p_treat = pf(f_treat, t_df, tot_df, lower.tail = F)
+  
+  
+  stars = function(pvalue){
+    if (is.na(pvalue)) {
+        return("")
+    }
+    if(pvalue < 0.001){
+      return("***")
+    }else if(pvalue <= 0.01){
+      return("**")
+    }else if(pvalue <= 0.05){
+      return("*")
+    }else if(pvalue <= 0.1){
+      return(".")
+    }else{
+      return("")
+    }
+  }
+  
+  s_treat = stars(p_treat)
+
+  
+  anov_tab = data.frame(
+    x. = c("Treatment", "Error", "Total"),
+    Df = c(t_df, err_df, tot_df),
+    `Sum Sq` = c(tss, ess, total_ss),
+    `Mean Sq` = c(ms_treat, ms_err, NA),
+    `F value` = c(f_treat, NA, NA),
+    `Pr(>F)` = c(paste(p_treat, s_treat), NA, NA)
+  )
+  
+  return(anov_tab)
+  
+}
+
+
+
+
+{r}
+# custom table
+custom_LSD_anova(yield_data)

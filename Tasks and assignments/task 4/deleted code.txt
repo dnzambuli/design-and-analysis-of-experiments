@@ -1,0 +1,198 @@
+######################################
+#
+## emmeans
+#
+######################################
+
+library(emmeans)
+
+# marginal means
+marginal_means = emmeans(anova_table, ~Humidity*Light_exposure)
+
+# pairwise comparison
+pairwise_comp = contrast(marginal_means, interaction = "pairwise")
+
+summary(pairwise_comp)
+
+
+#########################################
+#
+##
+#
+#########################################
+pairwise_df = as.data.frame(summary(pairwise_comp))
+ggplot(pairwise_df, aes(x = contrast, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  xlab("Comparisons") +
+  ylab("Estimated Differences") +
+  ggtitle("Pairwise Comparisons of Humidity and Light Exposure") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+#######################################
+##
+# Tukey HSD
+##
+#########################################
+library(stats)
+library(graphics)
+hsd_test = TukeyHSD(anova_table,conf.level = .95)
+summary(hsd_test)
+
+
+{r fig.height= 10}
+plot(hsd_test)
+
+
+
+##########################################
+#
+## data generation
+#
+##########################################
+
+# set.seed(223)
+# prod = rnorm(8, mean = 0, sd = 1)
+# response_1 = 150 + (prod - min(prod)) * (300 - 150) / (max(prod) - min(prod))
+
+# set.seed(222)
+# response_3 = rpois(8, 250)
+
+# response = c(response_1, response_2, response_3)
+
+
+#########################################
+#
+## interpreting the p values
+#
+#########################################
+
+The cross effect of $Humidity\ X\ Light\ Exposure$ has the highest variability caused by the two factors. This is because it has the highest sum of squared errors
+
+Temperature, Humidity, and Light_exposure: None of these factors individually show a statistically significant effect on the response variable (p-values are all above 0.05).
+
+Humidity:Light_exposure: The interaction between Humidity and Light exposure is significant (p-value = 0.0134), indicating that the combined effect of Humidity and Light exposure on the response variable is statistically significant.
+
+The only significant factor is the interaction between Humidity and Light exposure, suggesting that the combined effect of these two factors has a statistically significant impact on the hypothetical count of desloratadine in pg/mg in hair from the material degradation experiment.
+
+
+##########################################
+#
+## post-hoc
+#
+##########################################
+
+### Post-hoc analysis
+
+```{r}
+library(ggplot2)
+```
+
+#### Interaction Plot
+
+```{r}
+interaction.plot(
+  des_data$Humidity, des_data$Light_exposure, des_data$Response,
+  xlab = "Humidity", ylab = "Mean Response", trace.label = "Light Exposure",
+  col = c("red", "blue"), lwd = 2
+)
+```
+
+> **Observation**
+>
+> -   The solid blue line represents the mean concentration of desloratadine in pg/mg when light exposure is low (L).
+>
+> -   The dashed red line represents the mean concentration when light exposure is high (L).
+>
+> -   When there is `low light exposure` the mean concentration of desloratadine **increases** as `humidity changes from high to low`
+>
+> -   When there is `high light exposure` the mean concentration of desloratadine **decreases** as `humidity changes from high to low`
+>
+> **Explanation**
+>
+> The crossing of the lines indicates that effects of Humidity on desloratidine concentration depends on the amount of light exposure on the decomposing hair.
+>
+> There are higher concentrations when there is `high light exposure` and `high humidity` . This is reversed when there is `low humidity` . In this case `low light exposure` causes the concentration to increase.
+
+### LSD Test
+
+(Zach, 2022)
+
+```{r}
+library(agricolae)
+LSD.test(anova_table, c("Humidity", "Light_exposure"))$groups
+```
+
+> **Observations**
+>
+> -   `low(H):low(L)` and `high(H):high(L)` both have the letter "a", indicating there's no significant difference between these two conditions despite one being low. They also have the highest observable yield respectively.
+>
+> -   `low(H):high(L)` has letters "ab", meaning its mean response is not significantly different from the groups labeled "a" or "b". This places it in an intermediate position.
+>
+> -   `high(H):low(L)` only has the letter "b", showing it is significantly different from the group with level "a". There is also an observable lower mean observation of `186.5291` than the groups with the label "a".
+>
+> **Conclusion**
+>
+> These observations are also reflected in the interaction plot with `low(H):low(L)` and `high(H):high(L)` having the highest concentration.
+
+### Plot Box-Plot
+
+```{r}
+data_1 = des_data[, c(2, 3, 6)]
+data_1$interactions = interaction(data_1$Humidity, data_1$Light_exposure)
+head(data_1)
+```
+
+### Plot the data
+
+```{r}
+library(ggplot2)
+ggplot(data_1, aes(x=Humidity, y=Response, fill=Humidity)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Humidity", x="Humidity", y="Response")
+```
+
+```{r}
+ggplot(data_1, aes(x=Light_exposure, y=Response, fill=Humidity)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Light Exposure", x="Humidity", y="Response")
+```
+
+```{r}
+ggplot(data_1, aes(x=interactions, y=Response, fill=Humidity)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title="Boxplot of Response by Interactions", x="Humidity", y="Response")
+```
+
+> **Observations**
+>
+> -   low humidity yields higher responses regardless of light exposure
+>
+> -   high light causes more significant variation with change in humidity
+>
+> This backs the observation from the interaction plot, and the LSD test.
+>
+> **Explanation**
+>
+> The boxplots indicate that low humidity generally yields higher concentration regardless of light exposure, showing a clear trend across different light conditions. The response under high light varies more significantly with humidity changes compared to low light, suggesting that high light intensifies the effect of humidity on the response.
+
+############################################
+#
+##
+#
+#############################################
+
+high(H):high(T):high(L)	752.1650	a		
+high(H):low(T):high(L)	668.2581	b		
+low(H):high(T):high(L)	659.1837	b		
+high(H):high(T):low(L)	633.9103	b		
+low(H):low(T):high(L)	591.2168	c		
+low(H):high(T):low(L)	547.5244	d		
+high(H):low(T):low(L)	505.9535	e		
+low(H):low(T):low(L)
